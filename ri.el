@@ -118,7 +118,10 @@
     (erase-buffer)
     (process-send-string (ri-get-process) (concat string "\n"))
     (accept-process-output (ri-get-process) 3 0 t)
-    (buffer-string)))
+    (buffer-substring (point-min)
+		      (save-excursion
+			(goto-char (point-max))
+			(search-backward ">>" nil t)))))
 
 (provide 'ri)
 ;;; ri.el ends here
