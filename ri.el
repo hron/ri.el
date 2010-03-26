@@ -86,10 +86,10 @@
 (defvar ri-mode-map
   (let ((map (make-keymap)))
     (suppress-keymap map t)
-    (define-key map (kbd "q")  'quit-window)
-    (define-key map (kbd "\n") 'ri-follow)
+    (define-key map (kbd "q")  	 'quit-window)
+    (define-key map (kbd "\n") 	 'ri-follow)
     (define-key map (kbd "SPC")  'scroll-up)
-    (define-key map (kbd "\C-?")  'scroll-down)
+    (define-key map (kbd "\C-?") 'scroll-down)
     map))
 
 ;;; Completion
