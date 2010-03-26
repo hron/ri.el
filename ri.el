@@ -22,21 +22,21 @@
 ;; WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;; General Public License for more details.
-;;
-;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see `http://www.gnu.org/licenses/'.
 
 ;;; Commentary:
 
 ;; ri.el provides an Emacs frontend to Ruby's `ri' documentation
 ;; tool. It offers lookup and completion.
-;;
-;; It's designed to work with RDoc 2.2.2, but if you only have RDoc
-;; 2.2.1 installed, you can download a helper script; see the
-;; docstring for `ri-repl-executable' for details.
+
+;; This version will load all completion targets the first time it's
+;; invoked. This can be a significant startup time, but it will not
+;; have to look up anything after that point. It also has no external
+;; dependencies except for having `ri' on your path. If RDoc 2.x is
+;; not installed, it will fall back to ri 1.x.
 
 ;;; TODO:
 
+;; * Replace Const.method with Const::method on the fly
 ;; * Hyperlinked ri-follow command
 ;; * Font Lock
 ;; * Flex matching?
@@ -52,13 +52,8 @@
 (defvar ri-mode-hook nil
   "Hooks to run when invoking ri-mode.")
 
-(defvar ri-repl-executable "ri --repl"
-  "Executable to use to perform RI lookups.
-
-If RDoc 2.2.2 or greater is installed, this library should be
-able to use the `ri --repl' command as provided by that gem. If
-for some reason that is unavailable, download the ri_repl script
-from http://p.hagelb.org/ri_repl instead.")
+(defvar ri-names nil
+  "All RI completion targets.")
 
 ;;;###autoload
 (defun ri (&optional ri-documented)
@@ -67,13 +62,15 @@ from http://p.hagelb.org/ri_repl instead.")
   (setq ri-documented (or ri-documented (ri-completing-read)))
   (let ((ri-buffer-name (format "*ri %s*" ri-documented)))
     (unless (get-buffer ri-buffer-name)
-      (let ((ri-content (ri-query ri-documented)))
-        (setq ri-buffer (get-buffer-create ri-buffer-name))
-        (with-current-buffer ri-buffer
-          (erase-buffer)
-          (insert ri-content)
-          (goto-char (point-min))
-          (ri-mode))))
+      (let ((ri-buffer (get-buffer-create ri-buffer-name)))
+	(display-buffer ri-buffer)
+	(with-current-buffer ri-buffer
+	  (erase-buffer)
+	  (insert (shell-command-to-string (format "ri --format=ansi %s"
+						   ri-documented)))
+	  (ansi-color-apply-on-region (point-min) (point-max))
+	  (goto-char (point-min))
+	  (ri-mode))))
     (display-buffer ri-buffer-name)))
 
 (defun ri-mode ()
@@ -89,69 +86,33 @@ from http://p.hagelb.org/ri_repl instead.")
 (defvar ri-mode-map
   (let ((map (make-keymap)))
     (suppress-keymap map t)
-    (define-key map (kbd "q")  'quit-window)
-    (define-key map (kbd "\n") 'ri-follow)
+    (define-key map (kbd "q")  	 'quit-window)
+    (define-key map (kbd "\n") 	 'ri-follow)
     (define-key map (kbd "SPC")  'scroll-up)
-    (define-key map (kbd "\C-?")  'scroll-down)
+    (define-key map (kbd "\C-?") 'scroll-down)
     map))
 
 ;;; Completion
 
 (defun ri-completing-read ()
   "Read the name of a Ruby class, module, or method to look up."
-  (let (ri-completions-alist) ;; Needs to be dynamically bound.
-    (completing-read "RI: " 'ri-complete nil t (ri-symbol-at-point))))
+  (setq ri-names (or ri-names (ri-names)))
+  (completing-read "RI: " ri-names nil t (ri-symbol-at-point)))
 
-(defun ri-complete (string predicate flag)
-  "Dispatch to the proper completion functions based on flag."
-  ;; Populate ri-completions-alist if necessary
-  (unless (assoc string ri-completions-alist)
-    (add-to-list 'ri-completions-alist
-                 (cons string
-                       (split-string (ri-query (concat "Complete: " string))))))
-  (cond ((eq t flag)
-         (ri-all-completions string))
-        ((eq nil flag)
-         (ri-try-completion string))
-        ((eq 'lambda flag)
-         (ri-test-completion string))
-        ((and (listp flag) (eq (car flag) 'boundaries))
-         ;; Going to treat boundaries like all-completions for now.
-         (ri-all-completions string))))
-
-(defun ri-test-completion (string)
-  "Return non-nil if STRING is a valid completion."
-  (assoc string ri-completions-alist))
-
-(defun ri-all-completions (string)
-  "Search for partial matches to STRING in RDoc."
-  (cdr (assoc string ri-completions-alist)))
-
-(defun ri-try-completion (string)
-  "Return common substring of all completions of STRING in RDoc."
-  (ido-find-common-substring (ri-all-completions string) string))
+(defun ri-names ()
+  "One-liner to make RI spit out every class, module, and method name."
+  (let ((ri-output (shell-command-to-string "ruby -rubygems -e \"require 'rdoc/ri/reader'; require 'rdoc/ri/cache'; require 'rdoc/ri/paths'; puts RDoc::RI::Reader.new(RDoc::RI::Cache.new(RDoc::RI::Paths.path(true, true, true, true))).all_names.join(\\\"\n\\\")\"")))
+    (split-string (if (string-match "no such file to load" ri-output)
+		      ;; Fall back to ri 1.x
+		      (shell-command-to-string "ri -l")
+		    ri-output))))
 
 (defun ri-symbol-at-point ()
   ;; TODO: make this smart about class/module at point
   (let ((ri-symbol (symbol-at-point)))
     (if ri-symbol
-        (symbol-name ri-symbol)
+	(symbol-name ri-symbol)
       "")))
-
-;;; Process Communication
-
-(defun ri-get-process ()
-  "Return the subprocess, starting it if necessary."
-  (or (get-process "ri-repl")
-      (start-process "ri-repl" " *ri-output*" (concat (getenv "HOME") "/.emacs.d/site-lisp/ri.el/ri_repl"))))
-
-(defun ri-query (string)
-  "Passes the `command' to the `ri' subprocess."
-  (with-current-buffer (process-buffer (ri-get-process))
-    (erase-buffer)
-    (process-send-string (ri-get-process) (concat string "\n"))
-    (accept-process-output (ri-get-process) 3 0 t)
-    (buffer-string)))
 
 (provide 'ri)
 ;;; ri.el ends here
