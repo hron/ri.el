@@ -62,25 +62,33 @@
   (setq ri-documented (or ri-documented (ri-completing-read)))
   (let ((ri-buffer-name (format "*ri %s*" ri-documented)))
     (unless (get-buffer ri-buffer-name)
-      (let ((ri-buffer (get-buffer-create ri-buffer-name)))
-        (display-buffer ri-buffer)
-        (with-current-buffer ri-buffer
-          (erase-buffer)
-          (insert (shell-command-to-string (format "ri %s"
-                                                   ri-documented)))
-          (goto-char (point-min))
-          (ri-mode))))))
+      (let ((ri-content (ri-query ri-documented)))
+	(setq ri-buffer (get-buffer-create ri-buffer-name))
+	(with-current-buffer ri-buffer
+	  (erase-buffer)
+	  (insert ri-content)
+	  (goto-char (point-min))
+	  (ri-mode))))
+    (display-buffer ri-buffer-name)))
 
 (defun ri-mode ()
   "Mode for viewing Ruby documentation."
   (buffer-disable-undo)
   (kill-all-local-variables)
-  (local-set-key (kbd "q") 'quit-window)
-  (local-set-key (kbd "RET") 'ri-follow)
+  (use-local-map ri-mode-map)
   (setq mode-name "ri")
   (setq major-mode 'ri-mode)
   (setq buffer-read-only t)
   (run-hooks 'ri-mode-hook))
+
+(defvar ri-mode-map
+  (let ((map (make-keymap)))
+    (suppress-keymap map t)
+    (define-key map (kbd "q")  'quit-window)
+    (define-key map (kbd "\n") 'ri-follow)
+    (define-key map (kbd "SPC")  'scroll-up)
+    (define-key map (kbd "\C-?")  'scroll-down)
+    map))
 
 ;;; Completion
 
@@ -93,15 +101,15 @@
   "One-liner to make RI spit out every class, module, and method name."
   (let ((ri-output (shell-command-to-string "ruby -rubygems -e \"require 'rdoc/ri/reader'; require 'rdoc/ri/cache'; require 'rdoc/ri/paths'; puts RDoc::RI::Reader.new(RDoc::RI::Cache.new(RDoc::RI::Paths.path(true, true, true, true))).all_names.join(\\\"\n\\\")\"")))
     (split-string (if (string-match "no such file to load" ri-output)
-                      ;; Fall back to ri 1.x
-                      (shell-command-to-string "ri -l")
-                    ri-output))))
+		      ;; Fall back to ri 1.x
+		      (shell-command-to-string "ri -l")
+		    ri-output))))
 
 (defun ri-symbol-at-point ()
   ;; TODO: make this smart about class/module at point
   (let ((ri-symbol (symbol-at-point)))
     (if ri-symbol
-        (symbol-name ri-symbol)
+	(symbol-name ri-symbol)
       "")))
 
 (defun ri-query (string)
