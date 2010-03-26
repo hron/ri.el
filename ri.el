@@ -65,27 +65,35 @@ from http://p.hagelb.org/ri_repl instead.")
   "Look up Ruby documentation."
   (interactive)
   (setq ri-documented (or ri-documented (ri-completing-read)))
-  (let* ((ri-buffer-name (format "*ri %s*" ri-documented))
-         (ri-buffer (get-buffer-create ri-buffer-name)))
+  (let ((ri-buffer-name (format "*ri %s*" ri-documented)))
     (unless (get-buffer ri-buffer-name)
       (let ((ri-content (ri-query ri-documented)))
+        (setq ri-buffer (get-buffer-create ri-buffer-name))
         (with-current-buffer ri-buffer
           (erase-buffer)
           (insert ri-content)
           (goto-char (point-min))
           (ri-mode))))
-    (display-buffer ri-buffer)))
+    (display-buffer ri-buffer-name)))
 
 (defun ri-mode ()
   "Mode for viewing Ruby documentation."
   (buffer-disable-undo)
   (kill-all-local-variables)
-  (local-set-key (kbd "q") 'quit-window)
-  (local-set-key (kbd "RET") 'ri-follow)
+  (use-local-map ri-mode-map)
   (setq mode-name "ri")
   (setq major-mode 'ri-mode)
   (setq buffer-read-only t)
   (run-hooks 'ri-mode-hook))
+
+(defvar ri-mode-map
+  (let ((map (make-keymap)))
+    (suppress-keymap map t)
+    (define-key map (kbd "q")  'quit-window)
+    (define-key map (kbd "\n") 'ri-follow)
+    (define-key map (kbd "SPC")  'scroll-up)
+    (define-key map (kbd "\C-?")  'scroll-down)
+    map))
 
 ;;; Completion
 
