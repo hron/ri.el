@@ -62,11 +62,12 @@
   (setq ri-documented (or ri-documented (ri-completing-read)))
   (let ((ri-buffer-name (format "*ri %s*" ri-documented)))
     (unless (get-buffer ri-buffer-name)
-      (let ((ri-content (ri-query ri-documented)))
-	(setq ri-buffer (get-buffer-create ri-buffer-name))
+      (let ((ri-buffer (get-buffer-create ri-buffer-name)))
+	(display-buffer ri-buffer)
 	(with-current-buffer ri-buffer
 	  (erase-buffer)
-	  (insert ri-content)
+	  (insert (shell-command-to-string (format "ri %s"
+						   ri-documented)))
 	  (goto-char (point-min))
 	  (ri-mode))))
     (display-buffer ri-buffer-name)))
@@ -112,16 +113,6 @@
 	(symbol-name ri-symbol)
       "")))
 
-(defun ri-query (string)
-  "Passes the `command' to the `ri' subprocess."
-  (with-current-buffer (process-buffer (ri-get-process))
-    (erase-buffer)
-    (process-send-string (ri-get-process) (concat string "\n"))
-    (accept-process-output (ri-get-process) 3 0 t)
-    (buffer-substring (point-min)
-		      (save-excursion
-			(goto-char (point-max))
-			(search-backward ">>" nil t)))))
 
 (provide 'ri)
 ;;; ri.el ends here
