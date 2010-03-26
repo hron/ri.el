@@ -66,8 +66,9 @@
 	(display-buffer ri-buffer)
 	(with-current-buffer ri-buffer
 	  (erase-buffer)
-	  (insert (shell-command-to-string (format "ri %s"
-						   ri-documented)))
+	  (insert (shell-command-to-string (format "ri --format=ansi %s"
+						    ri-documented)))
+	  (ansi-color-apply-on-region (point-min) (point-max))
 	  (goto-char (point-min))
 	  (ri-mode))))
     (display-buffer ri-buffer-name)))
