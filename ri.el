@@ -65,16 +65,16 @@ from http://p.hagelb.org/ri_repl instead.")
   "Look up Ruby documentation."
   (interactive)
   (setq ri-documented (or ri-documented (ri-completing-read)))
-  (let ((ri-buffer-name (format "*ri %s*" ri-documented)))
+  (let* ((ri-buffer-name (format "*ri %s*" ri-documented))
+         (ri-buffer (get-buffer-create ri-buffer-name)))
     (unless (get-buffer ri-buffer-name)
-      (let ((ri-buffer (get-buffer-create ri-buffer-name))
-            (ri-content (ri-query ri-documented)))
-        (display-buffer ri-buffer)
+      (let ((ri-content (ri-query ri-documented)))
         (with-current-buffer ri-buffer
           (erase-buffer)
           (insert ri-content)
           (goto-char (point-min))
-          (ri-mode))))))
+          (ri-mode))))
+    (display-buffer ri-buffer)))
 
 (defun ri-mode ()
   "Mode for viewing Ruby documentation."
@@ -135,7 +135,7 @@ from http://p.hagelb.org/ri_repl instead.")
 (defun ri-get-process ()
   "Return the subprocess, starting it if necessary."
   (or (get-process "ri-repl")
-      (start-process "ri-repl" " *ri-output*" "ri_repl")))
+      (start-process "ri-repl" " *ri-output*" (concat (getenv "HOME") "/.emacs.d/site-lisp/ri.el/ri_repl"))))
 
 (defun ri-query (string)
   "Passes the `command' to the `ri' subprocess."
