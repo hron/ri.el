@@ -101,7 +101,7 @@
 
 (defun ri-names ()
   "One-liner to make RI spit out every class, module, and method name."
-  (let ((ri-output (shell-command-to-string "ruby -rubygems -e \"require 'rdoc/ri/reader'; require 'rdoc/ri/cache'; require 'rdoc/ri/paths'; puts RDoc::RI::Reader.new(RDoc::RI::Cache.new(RDoc::RI::Paths.path(true, true, true, true))).all_names.join(\\\"\n\\\")\"")))
+  (let ((ri-output (shell-command-to-string "ruby -rubygems -e \"gem 'rdoc','=2.4.3'; require 'rdoc/ri/reader'; require 'rdoc/ri/cache'; require 'rdoc/ri/paths'; puts RDoc::RI::Reader.new(RDoc::RI::Cache.new(RDoc::RI::Paths.path(true, true, true, true))).all_names.join(\\\"\n\\\")\"")))
     (split-string (if (string-match "no such file to load" ri-output)
 		      ;; Fall back to ri 1.x
 		      (shell-command-to-string "ri -l")
